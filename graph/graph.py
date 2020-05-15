@@ -56,6 +56,7 @@ class SquareGrid:
         (x, y) = id
         return self.xmin <= x < self.xmax and self.ymin <= y < self.ymax
     
+    # Depricated
     def is_valid_point(self, id):
         (x, y) = id
         return (not bool(((x-self.step/2)%self.step) and bool((y-self.step/2)%self.step))) and self.in_bounds(id)
@@ -102,15 +103,14 @@ class SquareGrid:
             else:
                 raise ValueError("Such station already exists!")
             
-                    
     def expand_borders(self):
-        """Expand borders of each station"""
-        raise NotImplementedError
-        
-    def plot(self, axis):
-        
-#        self.grid()
-        
+        for station in self.stations.values():
+            #station.expand_border()
+            if station.expand_border():
+                next
+        print(" Queues are empty")
+                
+    def get_known_territories(self):
         frontier = []
         
         for station in self.stations.values():
@@ -118,6 +118,15 @@ class SquareGrid:
                 frontier.append(cell)
             
         known_territory = [cell for cell in self.visited_cells.keys() if p not in frontier]
+        
+        return known_territory, frontier
+            
+            
+    def plot(self, axis):
+        
+#        self.grid()
+        
+        known_territory, frontier = self.get_known_territories()
 
         # known_territory
         self.geo_grid[self.geo_grid.coords.isin(known_territory)].plot(ax = ax, color = 'lightcyan', ec = 'bisque')
@@ -125,9 +134,33 @@ class SquareGrid:
         # Frontier cells
         self.geo_grid[self.geo_grid.coords.isin(frontier)].plot(ax = ax, color = 'deepskyblue', ec = 'bisque')
 
-        # Other cells
+        # Unknown cells
         self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = ax, color = 'cyan', ec = 'bisque')
 
+    def plot_animation(self, axis):
+        art = []
+        known_territory, frontier = self.get_known_territories()
+
+        # known_territory
+        for artist in self.geo_grid[self.geo_grid.coords.isin(known_territory)].plot(ax = axis,
+                                                                                     color = 'lightcyan',
+                                                                                     ec = 'bisque').get_children():
+            art.append(artist)
+
+        # Frontier cells
+        for artist in self.geo_grid[self.geo_grid.coords.isin(frontier)].plot(ax = axis, 
+                                                                              color = 'deepskyblue',
+                                                                              ec = 'bisque').get_children():
+            art.append(artist)
+
+
+        # Other cells
+        for artist in self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = axis, 
+                                                                                                      color = 'cyan', 
+                                                                                                      ec = 'bisque').get_children():
+            art.append(artist)
+            
+        return art
         
     def set_grid(self):
         """Attribute to be implemented"""
@@ -136,6 +169,7 @@ class SquareGrid:
     def set_rows_columns(self):
         """Attributes to be implemented"""
         raise NotImplementedError
+
 
 
 
@@ -182,9 +216,12 @@ class Station(SquareGrid):
                     if neighbor not in self.visited_cells:
                         self.queue.put(neighbor)
                         self.visited_cells[neighbor] = self.coordinates
-
+            return 0            
+#         else:
+#             raise ValueError(" Queue is emplty!")
+            
         else:
-            raise ValueError("Queue is empty!")
+            return 1
             
     def plot_step(self):
         visited = [p for p in self.visited_cells.keys() if p not in self.queue.elements]
@@ -198,3 +235,5 @@ class Station(SquareGrid):
 
         # Other cells
         self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = ax, color = 'cyan', ec = 'bisque')
+
+    
