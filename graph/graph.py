@@ -6,9 +6,7 @@ from matplotlib import animation
 import collections
 
 class SquareGrid:
-    visited_cells = {}
-    geo_grid = None
-    
+
     def __init__(self, data, step: float):
         #if isinstance(data, GeoDataFrame):
         self.step = step
@@ -24,8 +22,8 @@ class SquareGrid:
             self.bounds = [self.xmin, self.ymin, self.xmax, self.ymax]
             
         self.stations = {}
-        geo_grid = self.grid()
-    
+        self.geo_grid = self.grid()
+        self.visited_cells = {}    
 #    @attribute
 #    self.geo_grid = selg.grid()
     
@@ -38,24 +36,21 @@ class SquareGrid:
         
         
     def grid(self):
-        try:
-            return self.geo_grid
-        except:
-            self.columns = list(np.arange(int(np.floor(self.xmin)), int(np.ceil(self.xmax)), self.step))
-            self.rows = list(np.arange(int(np.floor(self.ymin)), int(np.ceil(self.ymax)), self.step)+self.step)
-            self.rows.reverse()
+        self.columns = list(np.arange(int(np.floor(self.xmin)), int(np.ceil(self.xmax)), self.step))
+        self.rows = list(np.arange(int(np.floor(self.ymin)), int(np.ceil(self.ymax)), self.step)+self.step)
+        self.rows.reverse()
 
-            self.geo_grid = gpd.GeoDataFrame(columns = ['geometry'])
-            for row in self.rows:
-                for column in self.columns:
-                    self.geo_grid.loc[len(self.geo_grid)]=Polygon([(column, row), (column + wide, row), (column + self.step, row - self.step), (column, row - self.step)])
+        self.geo_grid = gpd.GeoDataFrame(columns = ['geometry'])
+        for row in self.rows:
+            for column in self.columns:
+                self.geo_grid.loc[len(self.geo_grid)]=Polygon([(column, row), (column + wide, row), (column + self.step, row - self.step), (column, row - self.step)])
 
-            self.geo_grid['centroid'] = self.geo_grid.geometry.centroid
-            self.geo_grid['num'] = self.geo_grid.index + 1
-            self.geo_grid['coords'] = self.geo_grid['geometry'].apply(lambda x: x.representative_point().coords[:])
-            self.geo_grid['coords'] = [coords[0] for coords in self.geo_grid['coords']]
-            
-            return self.geo_grid
+        self.geo_grid['centroid'] = self.geo_grid.geometry.centroid
+        self.geo_grid['num'] = self.geo_grid.index + 1
+        self.geo_grid['coords'] = self.geo_grid['geometry'].apply(lambda x: x.representative_point().coords[:])
+        self.geo_grid['coords'] = [coords[0] for coords in self.geo_grid['coords']]
+
+        return self.geo_grid
 
     def in_bounds(self, id):
         (x, y) = id
@@ -89,7 +84,9 @@ class SquareGrid:
         # Единичная проверка на валидность узла в рамках сетки
         if id != None:
             if id not in self.stations:
-                self.stations[self.is_valid_point_err(id)] = Station(id, self.bounds, self.step)
+                self.stations[self.is_valid_point_err(id)] = Station(id, self.bounds, self.step,
+                                                                     geo_grid=self.geo_grid, 
+                                                                     visited_cells=self.visited_cells)
                 self.visited_cells[id] = id
                 return self.stations[id]
             else:
@@ -97,7 +94,9 @@ class SquareGrid:
         elif x != None and y != None:
             id = (x, y)
             if id not in self.stations:
-                self.stations[self.is_valid_point_err(id)] = Station(id, self.bounds, self.step)
+                self.stations[self.is_valid_point_err(id)] = Station(id, self.bounds, self.step, 
+                                                                     geo_grid=self.geo_grid, 
+                                                                     visited_cells=self.visited_cells)
                 self.visited_cells[id] = id
                 return self.stations[id]
             else:
@@ -109,27 +108,25 @@ class SquareGrid:
         raise NotImplementedError
         
     def plot(self, axis):
-        """Plot each artist"""
-        raise NotImplementedError
         
-        self.grid()
+#        self.grid()
         
         frontier = []
         
-        for station in self.stations:
-            for cell in station.elements:
+        for station in self.stations.values():
+            for cell in station.queue.elements:
                 frontier.append(cell)
             
         known_territory = [cell for cell in self.visited_cells.keys() if p not in frontier]
 
         # known_territory
-#         self.geo_grid[self.geo_grid.coords.isin(known_territory)].plot(ax = ax, color = 'lightcyan', ec = 'bisque')
+        self.geo_grid[self.geo_grid.coords.isin(known_territory)].plot(ax = ax, color = 'lightcyan', ec = 'bisque')
 
-#         # Frontier cells
-#         self.geo_grid[self.geo_grid.coords.isin(self.queue.elements)].plot(ax = ax, color = 'deepskyblue', ec = 'bisque')
+        # Frontier cells
+        self.geo_grid[self.geo_grid.coords.isin(frontier)].plot(ax = ax, color = 'deepskyblue', ec = 'bisque')
 
-#         # Other cells
-#         self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = ax, color = 'cyan', ec = 'bisque')
+        # Other cells
+        self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = ax, color = 'cyan', ec = 'bisque')
 
         
     def set_grid(self):
@@ -139,6 +136,7 @@ class SquareGrid:
     def set_rows_columns(self):
         """Attributes to be implemented"""
         raise NotImplementedError
+
 
 
 
@@ -158,7 +156,12 @@ class Queue:
 		
 class Station(SquareGrid):
 
-    def __init__(self, id, bounds, step):
+    def __init__(self,
+                 id,
+                 bounds,
+                 step, 
+                 geo_grid,
+                 visited_cells):
         self.xmin, self.ymin, self.xmax, self.ymax = bounds
         self.step = step
         if self.is_valid_point(id):
@@ -167,8 +170,9 @@ class Station(SquareGrid):
             raise ValueError("Point given is not valid!")
         self.queue = Queue()
         self.queue.put(id)
-        self.visited_cells = SquareGrid.visited_cells
-        self.geo_grid = SquareGrid.geo_grid
+        self.visited_cells = visited_cells
+        self.geo_grid = geo_grid
+        self.visited_cells = visited_cells
             
     def expand_border(self):
         if not self.queue.empty():
