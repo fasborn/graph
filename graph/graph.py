@@ -12,12 +12,26 @@ class SquareGrid:
         self.xmin, self.ymin, self.xmax, self.ymax = bounds
         self.step = step
         self.bounds = bounds
-#         if self.is_valid_point(id):
-#             self.coordinates = id
-#         else:
-#             raise ValueError("Point given is not valid!")
         self.stations = {}
         
+    def grid(self):
+        try:
+            return self.geo_grid
+        except:
+            self.columns = list(np.arange(int(np.floor(self.xmin)), int(np.ceil(self.xmax)), self.step))
+            self.rows = list(np.arange(int(np.floor(self.ymin)), int(np.ceil(self.ymax)), self.step))
+            self.rows.reverse()
+
+            self.geo_grid = gpd.GeoDataFrame(columns = ['geometry'])
+            for row in self.rows:
+                for column in self.columns:
+                    self.geo_grid.loc[len(self.geo_grid)]=Polygon([(column, row), (column + wide, row), (column + self.step, row - self.step), (column, row - self.step)])
+
+            self.geo_grid['centroid'] = self.geo_grid.geometry.centroid
+            self.geo_grid['num'] = self.geo_grid.index + 1
+            self.geo_grid['coords'] = self.geo_grid['geometry'].apply(lambda x: x.representative_point().coords[:])
+            self.geo_grid['coords'] = [coords[0] for coords in self.geo_grid['coords']]    
+
     def in_bounds(self, id):
         (x, y) = id
         return self.xmin <= x < self.xmax and self.ymin <= y < self.ymax
@@ -51,6 +65,23 @@ class SquareGrid:
             return self.stations[id]
         else:
             raise ValueError("Such station already exists!")
+            
+    def expand_borders(self):
+        """Expand borders of each station"""
+        raise NotImplementedError
+        
+    def plot(self):
+        """Plot each artist"""
+        raise NotImplementedError
+        
+    def set_grid(self):
+        """Attribute to implement"""
+        raise NotImplementedError
+
+    def set_rows_columns(self):
+        """Attributes to be implemented"""
+        raise NotImplementedError
+
 
 class Queue:
     def __init__(self):
