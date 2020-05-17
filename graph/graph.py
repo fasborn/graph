@@ -35,7 +35,7 @@ class SquareGrid:
         raise NotImplementedError
         
         
-    def grid(self):
+    def grid_stable(self):
         self.columns = list(np.arange(int(np.floor(self.xmin)), int(np.ceil(self.xmax)), self.step))
         self.rows = list(np.arange(int(np.floor(self.ymin)), int(np.ceil(self.ymax)), self.step)+self.step)
         self.rows.reverse()
@@ -50,6 +50,43 @@ class SquareGrid:
         self.geo_grid['coords'] = self.geo_grid['geometry'].apply(lambda x: x.representative_point().coords[:])
         self.geo_grid['coords'] = [coords[0] for coords in self.geo_grid['coords']]
 
+        return self.geo_grid
+    
+    '''
+        
+      3 ←-- 2
+       |   ↑ 
+     4 ↓   |1
+    '''
+    
+    def create_polygon(self, params):
+        column, row = params
+        return Polygon([(column, row), # 1st point
+                        (column + self.step, row), # 2nd point
+                        (column + self.step, row - self.step), # 3rd point
+                        (column, row - self.step)]) # 4th point
+    
+    def grid(self):
+        
+        x = np.arange(int(np.floor(self.xmin)), int(np.ceil(self.xmax)), self.step)
+        y = np.arange(int(np.floor(self.ymin)), int(np.ceil(self.ymax)), self.step)+self.step
+
+        nx, ny = np.meshgrid(x, y)
+
+        nx = nx.reshape((np.prod(nx.shape),))
+        ny = ny.reshape((np.prod(ny.shape),))
+        ny = np.flip(ny)
+        
+        df = pd.DataFrame()
+        df['coords_rc'] = list(zip(nx, ny))
+        df['geometry'] = df.coords_rc.apply(self.create_polygon)
+        
+        self.geo_grid = gpd.GeoDataFrame(df, geometry = 'geometry')
+        self.geo_grid['centroid'] = self.geo_grid.geometry.centroid
+        self.geo_grid['num'] = self.geo_grid.index + 1
+        self.geo_grid['coords'] = self.geo_grid.centroid.apply(lambda p: (p.x, p.y))
+        
+        
         return self.geo_grid
 
     def in_bounds(self, id):
@@ -103,12 +140,47 @@ class SquareGrid:
             else:
                 raise ValueError("Such station already exists!")
             
-    def expand_borders(self):
-        for station in self.stations.values():
-            #station.expand_border()
-            if station.expand_border():
-                next
-        print(" Queues are empty")
+    def expand_borders(self, method = 'All', cat = None):
+        if method == 'All':
+            for station in self.stations.values():
+                if station.expand_border():
+                    next
+        if method == 'list':
+            if cat != None:
+                for station in cat:
+                    station.expand_border()
+            else:
+                raise ValueError('Pass station')
+        
+        
+    def cumul_exp(self, plot = 'False', *args, **kwargs):
+        temp_stations = self.stations.values()
+        
+        if plot == False:
+            while len(temp_stations):
+                for station in temp_stations:
+                    if station.queue.empty():
+                        temp_stations.remove(station)
+
+                expand_borders(method = 'list', cat = temp_stations)
+
+            print('end')
+            
+        elif plot == True:
+            container = []
+            
+            while len(temp_stations):
+                for station in temp_stations:
+                    if station.queue.empty():
+                        temp_stations.remove(station)
+
+                expand_borders(method = 'list', cat = temp_stations)
+                container.append(gr.plot_animation(ax, args, kwargs))
+            
+            return container
+            
+        else:
+            raise ValueError('Bad plot passed!')
                 
     def get_known_territories(self):
         frontier = []
@@ -117,47 +189,50 @@ class SquareGrid:
             for cell in station.queue.elements:
                 frontier.append(cell)
             
-        known_territory = [cell for cell in self.visited_cells.keys() if p not in frontier]
+        known_territory = [cell for cell in self.visited_cells.keys() if cell not in frontier]
         
         return known_territory, frontier
             
             
-    def plot(self, axis):
+    def plot(self, axis, colors = [['lightcyan', 'bisque'], ['deepskyblue', 'bisque'], ['cyan', 'bisque']]):
         
 #        self.grid()
         
         known_territory, frontier = self.get_known_territories()
 
         # known_territory
-        self.geo_grid[self.geo_grid.coords.isin(known_territory)].plot(ax = ax, color = 'lightcyan', ec = 'bisque')
+        self.geo_grid[self.geo_grid.coords.isin(known_territory)].plot(ax = ax, color = colors[0][0], ec = colors[0][1])
 
         # Frontier cells
-        self.geo_grid[self.geo_grid.coords.isin(frontier)].plot(ax = ax, color = 'deepskyblue', ec = 'bisque')
+        self.geo_grid[self.geo_grid.coords.isin(frontier)].plot(ax = ax, color = colors[1][0], ec = colors[1][1])
 
         # Unknown cells
-        self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = ax, color = 'cyan', ec = 'bisque')
+        self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = ax, color = colors[2][0], ec = colors[2][1])
 
-    def plot_animation(self, axis):
+    def plot_animation(self,
+                       axis,
+                       colors = [['lightcyan', 'bisque'], ['deepskyblue', 'bisque'], ['cyan', 'bisque']]):
+                       ##**kwargs):
         art = []
         known_territory, frontier = self.get_known_territories()
 
         # known_territory
         for artist in self.geo_grid[self.geo_grid.coords.isin(known_territory)].plot(ax = axis,
-                                                                                     color = 'lightcyan',
-                                                                                     ec = 'bisque').get_children():
+                                                                                     color = colors[0][0],
+                                                                                     ec = colors[0][1]).get_children():
             art.append(artist)
 
         # Frontier cells
         for artist in self.geo_grid[self.geo_grid.coords.isin(frontier)].plot(ax = axis, 
-                                                                              color = 'deepskyblue',
-                                                                              ec = 'bisque').get_children():
+                                                                              color = colors[1][0],
+                                                                              ec = colors[1][1]).get_children():
             art.append(artist)
 
 
         # Other cells
         for artist in self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = axis, 
-                                                                                                      color = 'cyan', 
-                                                                                                      ec = 'bisque').get_children():
+                                                                                                      color = colors[2][0], 
+                                                                                                      ec = colors[2][1]).get_children():
             art.append(artist)
             
         return art
@@ -169,6 +244,7 @@ class SquareGrid:
     def set_rows_columns(self):
         """Attributes to be implemented"""
         raise NotImplementedError
+
 
 
 
