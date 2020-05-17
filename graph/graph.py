@@ -24,8 +24,6 @@ class SquareGrid:
         self.stations = {}
         self.geo_grid = self.grid()
         self.visited_cells = {}    
-#    @attribute
-#    self.geo_grid = selg.grid()
     
     def create_array(self):
         self.columns = list(np.arange(int(np.floor(self.xmin)), int(np.ceil(self.xmax)), self.step))
@@ -153,8 +151,8 @@ class SquareGrid:
                 raise ValueError('Pass station')
         
         
-    def cumul_exp(self, plot = 'False', *args, **kwargs):
-        temp_stations = self.stations.values()
+    def cumul_exp(self, plot = False):
+        temp_stations = list(self.stations.values())
         
         if plot == False:
             while len(temp_stations):
@@ -162,7 +160,7 @@ class SquareGrid:
                     if station.queue.empty():
                         temp_stations.remove(station)
 
-                expand_borders(method = 'list', cat = temp_stations)
+                self.expand_borders(method = 'list', cat = temp_stations)
 
             print('end')
             
@@ -174,8 +172,8 @@ class SquareGrid:
                     if station.queue.empty():
                         temp_stations.remove(station)
 
-                expand_borders(method = 'list', cat = temp_stations)
-                container.append(gr.plot_animation(ax, args, kwargs))
+                self.expand_borders(method = 'list', cat = temp_stations)
+                container.append(self.plot_animation(ax))
             
             return container
             
@@ -244,11 +242,6 @@ class SquareGrid:
     def set_rows_columns(self):
         """Attributes to be implemented"""
         raise NotImplementedError
-
-
-
-
-
 
 
 class Queue:
