@@ -43,7 +43,7 @@ class SquareGrid:
         self.geo_grid = gpd.GeoDataFrame(columns = ['geometry'])
         for row in self.rows:
             for column in self.columns:
-                self.geo_grid.loc[len(self.geo_grid)]=Polygon([(column, row), (column + wide, row), (column + self.step, row - self.step), (column, row - self.step)])
+                self.geo_grid.loc[len(self.geo_grid)]=Polygon([(column, row), (column + self.step, row), (column + self.step, row - self.step), (column, row - self.step)])
 
         self.geo_grid['centroid'] = self.geo_grid.geometry.centroid
         self.geo_grid['num'] = self.geo_grid.index + 1
