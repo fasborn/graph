@@ -2,8 +2,8 @@ import numpy as np
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from shapely.geometry import Polygon
-from matplotlib import animation
 import collections
+import pandas as pd
 
 class SquareGrid:
 
@@ -179,7 +179,90 @@ class SquareGrid:
             
         else:
             raise ValueError('Bad plot passed!')
+  
+        
+
+        
+    def create_from_virtual(self):
+        """Method to be implemented"""
+        raise NotImplementedError
+    """
+    Можно создать полигоны станций уже в конце, когда виртуальная сетка посчитается.
+    Будет определено, к кому какие ячейки относятся и будут известны их геометрические параметры.
+    Можно будет понять, какие из них являются граничным и создать полигон из их внешних координат.
+    Можно даже подумать насчёт оптимизации расчета через проверку, лежать ли линии на одной линии, вопрос только в том, насколько целесообразна такая оптимизация
+    """
+           
+    
+    def random_color(self):
+        r = lambda: random.randint(0,255)
+        return '#%02X%02X%02X7f' % (r(),r(),r())
+        
+    def frontier_color(self, params):
+        if params[0]:
+            return params[1][:-2]
+        else:
+            return params[1]        
+    
+    def colorize(self, param):
+        colors = np.array(0, series.unique, 1)
+            
+    def plot_animation(self, axis):
+        
+        # Проверка на наличие объявленных станций сетки
+        if not bool(self.stations):
+            raise ValueError('No stations is deployed')
+        else:
+            temp_dict = {}
+
+            """
+            Надо подумать всё таки об использовании версии со словарем, 
+            а также об ускорении через убирание повторов операций, которые уже не нужны
+            """
+
+            # Создание общего словаря границ
+            for station, value in self.stations.items():
+                temp_dict[station] = value.queue.elements
+
+            # Быстрый перевод словаря во фрейм данных
+    #         self.dct_frame = pd.DataFrame(np.column_stack([list(temp_dict.keys()), list(temp_dict.values())]), 
+    #                                        columns=['frontier', 'values'])
+            self.dct_frame = pd.DataFrame({'station':chain(temp_dict.keys()),
+                                           'frontier':chain(temp_dict.values())})
+
+            #print(self.dct_frame.head())
+            # Расширение фрейма таким образом, что уникальными становятся значения посещенных ячеек, а не станций-посетителей (посетитель - список посещенных -> посетитель - посещенный)
+            s = self.dct_frame['frontier']
+            lens = s.str.len()
+            self.dct_frame = pd.DataFrame({
+                'is_front' : self.dct_frame['station'].values.repeat(lens),
+                'frontier' : list(chain.from_iterable(s))
+            })
+
+            # Подтягивание к основной сетке информации о посетителях ячеек
+            self.geo_grid['visited_from'] = self.geo_grid.coords.map(self.visited_cells)
+
+            # Подтягивание к основной сетке информации о граничных ячейках
+            self.geo_grid = self.geo_grid.merge(self.dct_frame,
+                                                left_on = 'coords',
+                                                right_on = 'is_front',
+                                                how = 'outer',
+                                                indicator = True)
+
+            mp = self.geo_grid.visited_from.unique()
+
+            #self.geo_grid['tbc'] = list(zip(self.geo_grid.visited_from, self.geo_grid.is_front))
+
+            colors = {}
+            for station in mp:
+                colors[station] = color()
                 
+            self.geo_grid['colors'] = self.geo_grid.visited_from.map(colors)
+            self.geo_grid['colors'] = pd.Series(zip(self.geo_grid.is_front, self.geo_grid.colors)).apply(frontier_color)
+            #return 
+
+        
+     
     def get_known_territories(self):
         frontier = []
         
@@ -207,7 +290,7 @@ class SquareGrid:
         # Unknown cells
         self.geo_grid[~self.geo_grid.coords.isin(list(self.visited_cells.keys()))].plot(ax = ax, color = colors[2][0], ec = colors[2][1])
 
-    def plot_animation(self,
+    def plot_animation_stable(self,
                        axis,
                        colors = [['lightcyan', 'bisque'], ['deepskyblue', 'bisque'], ['cyan', 'bisque']]):
                        ##**kwargs):
@@ -242,6 +325,7 @@ class SquareGrid:
     def set_rows_columns(self):
         """Attributes to be implemented"""
         raise NotImplementedError
+
 
 
 class Queue:
