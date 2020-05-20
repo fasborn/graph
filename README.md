@@ -21,4 +21,14 @@ ani.save('grid.mp4')
 
 
 
+
+gr = SquareGrid([0, 0, 20, 20], 1)
+
+stat_1 = gr.add_station(1.5, 2.5)
+stat_1 = gr.add_station(5.5, 8.5)
+stat_1 = gr.add_station(2.5, 4.5)
+
+gr.expand_borders()
+fig, ax = plt.subplots(figsize = (10, 10))
+gr.plot_grid(ax)
 ## Where to get it
